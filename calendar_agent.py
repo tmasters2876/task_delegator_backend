@@ -1,27 +1,18 @@
 import re
-import json
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import json
+import os
 
 def calendar_agent(state):
-    """
-    Syncs the provided daily schedule text to Google Calendar.
-    Safely reads token.json from your mounted Render disk (/var/data).
-    """
-
-    # 1️⃣ Get the schedule text from the pipeline state
     schedule_text = state.get("daily_schedule", "")
     lines = schedule_text.splitlines()
     calendar_confirmation = []
 
-    # 2️⃣ Use Render Disk location
-    TOKEN_PATH = "/var/data/token.json"
-    CREDENTIALS_PATH = "/var/data/credentials.json"  # If needed for refresh flow later
-
-    # 3️⃣ Load credentials
+    # ✅ Use Render disk paths
     creds = Credentials.from_authorized_user_info(
-        json.loads(open(TOKEN_PATH).read()),
+        json.loads(open("/var/data/token.json").read()),
         scopes=["https://www.googleapis.com/auth/calendar.events"]
     )
     service = build("calendar", "v3", credentials=creds)
@@ -33,15 +24,15 @@ def calendar_agent(state):
         if not line:
             continue
 
-        # Normalize odd dashes
+        # Normalize dashes
         line = line.replace("–", "-").replace("—", "-")
 
-        # Match full range: "5:00 PM - 6:00 PM - Summary"
+        # Pattern: start - end - title
         match = re.match(r"(\d{1,2}:\d{2}\s?[APMapm]{2})\s*-\s*(\d{1,2}:\d{2}\s?[APMapm]{2})\s*-\s*(.+)", line)
         if match:
             start_str, end_str, summary = match.groups()
         else:
-            # Fallback: "5:00 PM - Summary"
+            # Fallback: single time - title
             match = re.match(r"(\d{1,2}:\d{2}\s?[APMapm]{2})\s*-\s*(.+)", line)
             if match:
                 start_str, summary = match.groups()
@@ -64,18 +55,12 @@ def calendar_agent(state):
 
         event = {
             "summary": summary.strip(),
-            "start": {
-                "dateTime": start_datetime.isoformat(),
-                "timeZone": "America/Chicago",
-            },
-            "end": {
-                "dateTime": end_datetime.isoformat(),
-                "timeZone": "America/Chicago",
-            },
+            "start": {"dateTime": start_datetime.isoformat(), "timeZone": "America/Chicago"},
+            "end": {"dateTime": end_datetime.isoformat(), "timeZone": "America/Chicago"},
         }
 
         try:
-            service.events().insert(calendarId="primary", body=event).execute()
+            created_event = service.events().insert(calendarId="primary", body=event).execute()
             calendar_confirmation.append(f"✅ {summary.strip()} ({start_str} – {end_str})")
         except Exception as e:
             calendar_confirmation.append(f"❌ Failed to create event: {summary.strip()} — {str(e)}")
