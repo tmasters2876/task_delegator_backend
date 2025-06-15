@@ -6,8 +6,7 @@ import os
 app = Flask(__name__)
 
 # === CONFIG ===
-UPLOAD_KEY = os.environ.get("ADMIN_UPLOAD_KEY", "mysecretadminkey")  # store in Render env var
-
+UPLOAD_KEY = os.environ.get("ADMIN_UPLOAD_KEY", "mysecretadminkey")
 UPLOAD_FOLDER = "/var/data"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -25,13 +24,13 @@ def run_task_delegator():
     calendar_result = calendar_agent(final_state)
 
     return jsonify({
-        "classified_tasks": final_state.classified_tasks,
-        "optimized_tasks": final_state.optimized_tasks,
-        "delegated_tasks": final_state.delegated_tasks,
-        "prioritized_tasks": final_state.prioritized_tasks,
-        "daily_schedule": final_state.daily_schedule,
-        "action_summary": final_state.action_summary,
-        "calendar_confirmation": calendar_result["calendar_confirmation"]
+        "classified_tasks": final_state.classified_tasks or [],
+        "optimized_tasks": final_state.optimized_tasks or [],
+        "delegated_tasks": final_state.delegated_tasks or [],
+        "prioritized_tasks": final_state.prioritized_tasks or [],
+        "daily_schedule": final_state.daily_schedule or [],
+        "action_summary": final_state.action_summary or "",
+        "calendar_confirmation": calendar_result.get("calendar_confirmation") if calendar_result else "No confirmation"
     })
 
 # === UPLOAD SECRETS ===
@@ -54,6 +53,15 @@ def upload_secrets():
     token_file.save(token_path)
 
     return jsonify({"message": "Secrets uploaded successfully."})
+
+# === TEMPORARY: LIST FILES FOR DEBUG ===
+@app.route("/list-files", methods=["GET"])
+def list_files():
+    try:
+        files = os.listdir(UPLOAD_FOLDER)
+        return jsonify({"files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 # === ROOT ===
 @app.route("/", methods=["GET"])
