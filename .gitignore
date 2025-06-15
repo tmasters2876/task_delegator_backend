@@ -171,4 +171,5 @@ venv/
 
 # Environment secrets
 .env
-.json
+.jsoncredentials.json
+token.json
