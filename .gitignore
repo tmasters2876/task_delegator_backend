@@ -171,3 +171,4 @@ venv/
 
 # Environment secrets
 .env
+.json
