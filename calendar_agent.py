@@ -1,71 +1,44 @@
-from flask import Flask, request, jsonify
-from graph_runner import build_graph, AgentState
-from calendar_agent import calendar_agent
 import os
+import datetime
+import pytz
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 
-app = Flask(__name__)
+# === CONFIG ===
+CREDENTIALS_PATH = "/var/data/credentials.json"
+TOKEN_PATH = "/var/data/token.json"
 
-UPLOAD_KEY = os.environ.get("ADMIN_UPLOAD_KEY", "mysecretadminkey")
-UPLOAD_FOLDER = "/var/data"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+def calendar_agent(final_state):
+    """
+    Creates Google Calendar events based on the final_state's daily_schedule.
+    Uses OAuth credentials stored in /var/data.
+    """
 
-@app.route("/run", methods=["POST"])
-def run_task_delegator():
-    data = request.json or {}
-    user_input = data.get("tasks", "")
-    daily_context = data.get("daily_context", "")
-
-    state = AgentState(raw_input=user_input, daily_context=daily_context)
-    graph = build_graph()
-    final_state = graph.invoke(state)
-
-    calendar_result = calendar_agent(final_state)
-
-    return jsonify({
-        "classified_tasks": final_state.classified_tasks or [],
-        "optimized_tasks": final_state.optimized_tasks or [],
-        "delegated_tasks": final_state.delegated_tasks or [],
-        "prioritized_tasks": final_state.prioritized_tasks or [],
-        "daily_schedule": final_state.daily_schedule or [],
-        "action_summary": final_state.action_summary or "",
-        "calendar_confirmation": (
-            calendar_result["calendar_confirmation"]
-            if isinstance(calendar_result, dict) and "calendar_confirmation" in calendar_result
-            else "No confirmation"
-        )
-    })
-
-@app.route("/upload", methods=["POST"])
-def upload_secrets():
-    auth_header = request.headers.get("Authorization", "")
-    if f"Bearer {UPLOAD_KEY}" != auth_header:
-        return jsonify({"error": "Unauthorized"}), 403
-
-    if 'credentials' not in request.files or 'token' not in request.files:
-        return jsonify({"error": "Missing files"}), 400
-
-    creds_file = request.files['credentials']
-    token_file = request.files['token']
-
-    creds_path = os.path.join(UPLOAD_FOLDER, "credentials.json")
-    token_path = os.path.join(UPLOAD_FOLDER, "token.json")
-
-    creds_file.save(creds_path)
-    token_file.save(token_path)
-
-    return jsonify({"message": "Secrets uploaded successfully."})
-
-@app.route("/list-files", methods=["GET"])
-def list_files():
     try:
-        files = os.listdir(UPLOAD_FOLDER)
-        return jsonify({"files": files})
+        creds = Credentials.from_authorized_user_file(TOKEN_PATH)
+        service = build("calendar", "v3", credentials=creds)
+
+        timezone = "America/Chicago"
+
+        for item in final_state.daily_schedule:
+            event = {
+                "summary": item.get("summary", "Task"),
+                "description": item.get("description", ""),
+                "start": {
+                    "dateTime": item.get("start"),
+                    "timeZone": timezone,
+                },
+                "end": {
+                    "dateTime": item.get("end"),
+                    "timeZone": timezone,
+                },
+            }
+
+            service.events().insert(calendarId="primary", body=event).execute()
+
+        # ✅ GUARANTEED RETURN
+        return {"calendar_confirmation": "Events created successfully"}
+
     except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route("/", methods=["GET"])
-def index():
-    return "Task Delegator Backend is running."
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+        print(f"Calendar Agent Error: {e}")
+        return {"calendar_confirmation": f"Error: {e}"}

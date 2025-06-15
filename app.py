@@ -5,12 +5,10 @@ import os
 
 app = Flask(__name__)
 
-# === CONFIG ===
 UPLOAD_KEY = os.environ.get("ADMIN_UPLOAD_KEY", "mysecretadminkey")
 UPLOAD_FOLDER = "/var/data"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# === RUN TASK DELEGATOR ===
 @app.route("/run", methods=["POST"])
 def run_task_delegator():
     data = request.json or {}
@@ -37,7 +35,6 @@ def run_task_delegator():
         )
     })
 
-# === UPLOAD SECRETS ===
 @app.route("/upload", methods=["POST"])
 def upload_secrets():
     auth_header = request.headers.get("Authorization", "")
@@ -58,7 +55,6 @@ def upload_secrets():
 
     return jsonify({"message": "Secrets uploaded successfully."})
 
-# === TEMPORARY: LIST FILES ===
 @app.route("/list-files", methods=["GET"])
 def list_files():
     try:
@@ -67,11 +63,9 @@ def list_files():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# === ROOT ===
 @app.route("/", methods=["GET"])
 def index():
     return "Task Delegator Backend is running."
 
-# === MAIN ===
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
