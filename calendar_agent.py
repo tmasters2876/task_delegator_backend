@@ -1,68 +1,71 @@
-import re
-from datetime import datetime, timedelta
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-import json
+from flask import Flask, request, jsonify
+from graph_runner import build_graph, AgentState
+from calendar_agent import calendar_agent
 import os
 
-def calendar_agent(state):
-    schedule_text = state.get("daily_schedule", "")
-    lines = schedule_text.splitlines()
-    calendar_confirmation = []
+app = Flask(__name__)
 
-    # ✅ Use Render disk paths
-    creds = Credentials.from_authorized_user_info(
-        json.loads(open("/var/data/token.json").read()),
-        scopes=["https://www.googleapis.com/auth/calendar.events"]
-    )
-    service = build("calendar", "v3", credentials=creds)
+UPLOAD_KEY = os.environ.get("ADMIN_UPLOAD_KEY", "mysecretadminkey")
+UPLOAD_FOLDER = "/var/data"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-    today = datetime.now().date()
+@app.route("/run", methods=["POST"])
+def run_task_delegator():
+    data = request.json or {}
+    user_input = data.get("tasks", "")
+    daily_context = data.get("daily_context", "")
 
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
+    state = AgentState(raw_input=user_input, daily_context=daily_context)
+    graph = build_graph()
+    final_state = graph.invoke(state)
 
-        # Normalize dashes
-        line = line.replace("–", "-").replace("—", "-")
+    calendar_result = calendar_agent(final_state)
 
-        # Pattern: start - end - title
-        match = re.match(r"(\d{1,2}:\d{2}\s?[APMapm]{2})\s*-\s*(\d{1,2}:\d{2}\s?[APMapm]{2})\s*-\s*(.+)", line)
-        if match:
-            start_str, end_str, summary = match.groups()
-        else:
-            # Fallback: single time - title
-            match = re.match(r"(\d{1,2}:\d{2}\s?[APMapm]{2})\s*-\s*(.+)", line)
-            if match:
-                start_str, summary = match.groups()
-                start_time = datetime.strptime(start_str.strip(), "%I:%M %p")
-                end_time = start_time + timedelta(hours=1)
-                end_str = end_time.strftime("%I:%M %p")
-            else:
-                calendar_confirmation.append(f"⚠️ Skipped: {line}")
-                continue
+    return jsonify({
+        "classified_tasks": final_state.classified_tasks or [],
+        "optimized_tasks": final_state.optimized_tasks or [],
+        "delegated_tasks": final_state.delegated_tasks or [],
+        "prioritized_tasks": final_state.prioritized_tasks or [],
+        "daily_schedule": final_state.daily_schedule or [],
+        "action_summary": final_state.action_summary or "",
+        "calendar_confirmation": (
+            calendar_result["calendar_confirmation"]
+            if isinstance(calendar_result, dict) and "calendar_confirmation" in calendar_result
+            else "No confirmation"
+        )
+    })
 
-        try:
-            start_dt = datetime.strptime(start_str.strip(), "%I:%M %p")
-            end_dt = datetime.strptime(end_str.strip(), "%I:%M %p")
-        except Exception:
-            calendar_confirmation.append(f"❌ Time parse failed: {line}")
-            continue
+@app.route("/upload", methods=["POST"])
+def upload_secrets():
+    auth_header = request.headers.get("Authorization", "")
+    if f"Bearer {UPLOAD_KEY}" != auth_header:
+        return jsonify({"error": "Unauthorized"}), 403
 
-        start_datetime = datetime.combine(today, start_dt.time())
-        end_datetime = datetime.combine(today, end_dt.time())
+    if 'credentials' not in request.files or 'token' not in request.files:
+        return jsonify({"error": "Missing files"}), 400
 
-        event = {
-            "summary": summary.strip(),
-            "start": {"dateTime": start_datetime.isoformat(), "timeZone": "America/Chicago"},
-            "end": {"dateTime": end_datetime.isoformat(), "timeZone": "America/Chicago"},
-        }
+    creds_file = request.files['credentials']
+    token_file = request.files['token']
 
-        try:
-            created_event = service.events().insert(calendarId="primary", body=event).execute()
-            calendar_confirmation.append(f"✅ {summary.strip()} ({start_str} – {end_str})")
-        except Exception as e:
-            calendar_confirmation.append(f"❌ Failed to create event: {summary.strip()} — {str(e)}")
+    creds_path = os.path.join(UPLOAD_FOLDER, "credentials.json")
+    token_path = os.path.join(UPLOAD_FOLDER, "token.json")
 
-    return {"calendar_confirmation": "\n".join(calendar_confirmation)}
+    creds_file.save(creds_path)
+    token_file.save(token_path)
+
+    return jsonify({"message": "Secrets uploaded successfully."})
+
+@app.route("/list-files", methods=["GET"])
+def list_files():
+    try:
+        files = os.listdir(UPLOAD_FOLDER)
+        return jsonify({"files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route("/", methods=["GET"])
+def index():
+    return "Task Delegator Backend is running."
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)

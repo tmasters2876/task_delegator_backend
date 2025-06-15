@@ -30,7 +30,11 @@ def run_task_delegator():
         "prioritized_tasks": final_state.prioritized_tasks or [],
         "daily_schedule": final_state.daily_schedule or [],
         "action_summary": final_state.action_summary or "",
-        "calendar_confirmation": calendar_result.get("calendar_confirmation") if calendar_result else "No confirmation"
+        "calendar_confirmation": (
+            calendar_result["calendar_confirmation"]
+            if isinstance(calendar_result, dict) and "calendar_confirmation" in calendar_result
+            else "No confirmation"
+        )
     })
 
 # === UPLOAD SECRETS ===
@@ -54,7 +58,7 @@ def upload_secrets():
 
     return jsonify({"message": "Secrets uploaded successfully."})
 
-# === TEMPORARY: LIST FILES FOR DEBUG ===
+# === TEMPORARY: LIST FILES ===
 @app.route("/list-files", methods=["GET"])
 def list_files():
     try:
