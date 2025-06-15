@@ -1,0 +1,5 @@
+flask
+openai
+slack_sdk
+google-api-python-client
+python-dotenv
