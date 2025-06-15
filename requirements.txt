@@ -3,3 +3,7 @@ openai
 slack_sdk
 google-api-python-client
 python-dotenv
+langgraph
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
