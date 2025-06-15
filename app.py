@@ -22,17 +22,13 @@ def run_task_delegator():
     calendar_result = calendar_agent(final_state)
 
     return jsonify({
-        "classified_tasks": final_state.classified_tasks or [],
-        "optimized_tasks": final_state.optimized_tasks or [],
-        "delegated_tasks": final_state.delegated_tasks or [],
-        "prioritized_tasks": final_state.prioritized_tasks or [],
-        "daily_schedule": final_state.daily_schedule or [],
-        "action_summary": final_state.action_summary or "",
-        "calendar_confirmation": (
-            calendar_result["calendar_confirmation"]
-            if isinstance(calendar_result, dict) and "calendar_confirmation" in calendar_result
-            else "No confirmation"
-        )
+        "classified_tasks": final_state.classified_tasks,
+        "optimized_tasks": final_state.optimized_tasks,
+        "delegated_tasks": final_state.delegated_tasks,
+        "prioritized_tasks": final_state.prioritized_tasks,
+        "daily_schedule": final_state.daily_schedule,
+        "action_summary": final_state.action_summary,
+        "calendar_confirmation": calendar_result["calendar_confirmation"]
     })
 
 @app.route("/upload", methods=["POST"])
@@ -54,14 +50,6 @@ def upload_secrets():
     token_file.save(token_path)
 
     return jsonify({"message": "Secrets uploaded successfully."})
-
-@app.route("/list-files", methods=["GET"])
-def list_files():
-    try:
-        files = os.listdir(UPLOAD_FOLDER)
-        return jsonify({"files": files})
-    except Exception as e:
-        return jsonify({"error": str(e)})
 
 @app.route("/", methods=["GET"])
 def index():
