@@ -21,7 +21,6 @@ def run_task_delegator():
 
     calendar_result = calendar_agent(final_state)
 
-    # ✅ Use the AgentState's built-in dict conversion
     response = final_state.to_dict()
     response["calendar_confirmation"] = calendar_result["calendar_confirmation"]
 

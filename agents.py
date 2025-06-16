@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END
 from operator import itemgetter
 from langgraph.prebuilt import tools_condition
-from tasks import classify_tasks, optimize_tasks, delegate_tasks, prioritize_tasks, build_daily_schedule, summarize_action_plan
+from graph_runner import classify_tasks, optimize_tasks, delegate_tasks, prioritize_tasks, build_daily_schedule, summarize_action_plan
 
 # === Agent State ===
 class AgentState:
