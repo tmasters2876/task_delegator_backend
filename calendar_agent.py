@@ -16,7 +16,7 @@ def calendar_agent(final_state):
 
     service = build("calendar", "v3", credentials=creds)
 
-    for item in final_state["daily_schedule"]:  # ✅ corrected for dict
+    for item in final_state["daily_schedule"]:  # ✅ dict-safe
         event = {
             "summary": item["summary"],
             "start": {

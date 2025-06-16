@@ -30,7 +30,7 @@ def summarize_action_plan(schedule):
     return f"Planned {len(schedule)} tasks for today."
 
 def build_graph():
-    graph = StateGraph(dict)  # ✅ use dict not class
+    graph = StateGraph(dict)  # ✅ must be dict
 
     def classification_agent(data):
         print("DEBUG: Running classification_agent")
