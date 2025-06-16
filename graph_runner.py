@@ -61,26 +61,32 @@ def build_graph():
     graph = StateGraph(AgentState)
 
     def classification_agent(state):
+        print("DEBUG: Running classification_agent")
         state.classified_tasks = classify_tasks(state.raw_input)
         return state
 
     def optimization_agent(state):
+        print("DEBUG: Running optimization_agent")
         state.optimized_tasks = optimize_tasks(state.classified_tasks)
         return state
 
     def delegation_agent(state):
+        pprint("DEBUG: Running delegation_agent")
         state.delegated_tasks = delegate_tasks(state.optimized_tasks)
         return state
 
     def prioritization_agent(state):
+        print("DEBUG: Running prioritization_agent")
         state.prioritized_tasks = prioritize_tasks(state.delegated_tasks)
         return state
 
     def daily_schedule_agent(state):
+        print("DEBUG: Running daily_schedule_agent")
         state.daily_schedule = build_daily_schedule(state.prioritized_tasks, state.daily_context)
         return state
 
     def summarization_agent(state):
+        print("DEBUG: Running summarization_agent")
         state.action_summary = summarize_action_plan(state.daily_schedule)
         return state
 
