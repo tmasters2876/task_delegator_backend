@@ -21,15 +21,11 @@ def run_task_delegator():
 
     calendar_result = calendar_agent(final_state)
 
-    return jsonify({
-        "classified_tasks": final_state.classified_tasks,
-        "optimized_tasks": final_state.optimized_tasks,
-        "delegated_tasks": final_state.delegated_tasks,
-        "prioritized_tasks": final_state.prioritized_tasks,
-        "daily_schedule": final_state.daily_schedule,
-        "action_summary": final_state.action_summary,
-        "calendar_confirmation": calendar_result["calendar_confirmation"]
-    })
+    # ✅ Use the AgentState's built-in dict conversion
+    response = final_state.to_dict()
+    response["calendar_confirmation"] = calendar_result["calendar_confirmation"]
+
+    return jsonify(response)
 
 @app.route("/upload", methods=["POST"])
 def upload_secrets():

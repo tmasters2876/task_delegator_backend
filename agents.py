@@ -1,117 +1,91 @@
-from openai import OpenAI
-import os
-import json
-from dotenv import load_dotenv
-from notifier import send_slack_message, send_email
-from datetime import datetime
+from langgraph.graph import StateGraph, END
+from operator import itemgetter
+from langgraph.prebuilt import tools_condition
+from tasks import classify_tasks, optimize_tasks, delegate_tasks, prioritize_tasks, build_daily_schedule, summarize_action_plan
 
+# === Agent State ===
+class AgentState:
+    def __init__(self, raw_input="", daily_context=""):
+        self.raw_input = raw_input
+        self.classified_tasks = []
+        self.optimized_tasks = []
+        self.delegated_tasks = []
+        self.prioritized_tasks = []
+        self.daily_schedule = []
+        self.action_summary = ""
 
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    def to_dict(self):
+        def safe(obj):
+            if hasattr(obj, "model_dump"):
+                return obj.model_dump()
+            elif hasattr(obj, "__dict__"):
+                return obj.__dict__
+            elif isinstance(obj, list):
+                return [safe(x) for x in obj]
+            elif isinstance(obj, dict):
+                return {k: safe(v) for k, v in obj.items()}
+            else:
+                return obj
 
-def intake_agent(state):
-    return {"raw_input": state.raw_input}
+        return {
+            "raw_input": self.raw_input,
+            "classified_tasks": safe(self.classified_tasks),
+            "optimized_tasks": safe(self.optimized_tasks),
+            "delegated_tasks": safe(self.delegated_tasks),
+            "prioritized_tasks": safe(self.prioritized_tasks),
+            "daily_schedule": safe(self.daily_schedule),
+            "action_summary": self.action_summary,
+        }
 
-def classifier_agent(state):
-    prompt = f"Categorize tasks:\n{state.raw_input}"
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role":"user","content":prompt}],
-        temperature=0.3
-    )
-    raw_content = response.choices[0].message.content.strip()
-    try:
-        parsed = json.loads(raw_content)
-        return {"classified_tasks": parsed.get("classified_tasks", raw_content)}
-    except Exception:
-        return {"classified_tasks": raw_content}
+# === Core Task Agents ===
+def classification_agent(state):
+    tasks = classify_tasks(state.raw_input)
+    state.classified_tasks = tasks
+    return state
 
-def optimizer_agent(state):
-    prompt = f"Optimize sequence:\n{state.classified_tasks}"
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role":"user","content":prompt}],
-        temperature=0.4
-    )
-    raw_content = response.choices[0].message.content.strip()
-    try:
-        parsed = json.loads(raw_content)
-        return {"optimized_tasks": parsed.get("optimized_tasks", raw_content)}
-    except Exception:
-        return {"optimized_tasks": raw_content}
+def optimization_agent(state):
+    optimized = optimize_tasks(state.classified_tasks)
+    state.optimized_tasks = optimized
+    return state
 
-def delegator_agent(state):
-    prompt = f"Delegate each task to Self, Assistant, Family, or External:\n{state.optimized_tasks}"
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role":"user","content":prompt}],
-        temperature=0.4
-    )
-    raw_content = response.choices[0].message.content.strip()
-    try:
-        parsed = json.loads(raw_content)
-        return {"delegated_tasks": parsed.get("delegated_tasks", raw_content)}
-    except Exception:
-        return {"delegated_tasks": raw_content}
+def delegation_agent(state):
+    delegated = delegate_tasks(state.optimized_tasks)
+    state.delegated_tasks = delegated
+    return state
 
-def priority_agent(state):
-    prompt = f"Prioritize each delegated task as High, Medium, or Low:\n{state.delegated_tasks}"
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role":"user","content":prompt}],
-        temperature=0.4
-    )
-    raw_content = response.choices[0].message.content.strip()
-    try:
-        parsed = json.loads(raw_content)
-        return {"prioritized_tasks": parsed.get("prioritized_tasks", raw_content)}
-    except Exception:
-        return {"prioritized_tasks": raw_content}
+def prioritization_agent(state):
+    prioritized = prioritize_tasks(state.delegated_tasks)
+    state.prioritized_tasks = prioritized
+    return state
 
-def planner_agent(state):
-    context_note = f"Context: {state.daily_context}\n" if state.daily_context else ""
+def daily_schedule_agent(state):
+    schedule = build_daily_schedule(state.prioritized_tasks, state.daily_context)
+    state.daily_schedule = schedule
+    return state
 
-    # Calculate a smart anchor start time: now rounded to next 30min
-    now = datetime.now()
-    rounded_minute = 30 if now.minute >= 30 else 0
-    start_hour = now.hour if rounded_minute == 0 else (now.hour + 1)
-    start_time_str = f"{start_hour % 12 or 12}:{rounded_minute:02d} {'AM' if start_hour < 12 else 'PM'}"
+def summarization_agent(state):
+    summary = summarize_action_plan(state.daily_schedule)
+    state.action_summary = summary
+    return state
 
-    prompt = (
-        f"{context_note}"
-        f"You are a personal day planner. Use the following tasks to create a practical daily plan.\n\n"
-        f"Tasks:\n{state.prioritized_tasks}\n\n"
-        f"- Anchor start time: {start_time_str}\n"
-        f"- Fill remaining time with reasonable breaks, meals, or rest if needed.\n"
-        f"- Format: 'HH:MM AM/PM - HH:MM AM/PM - Task'\n"
-        f"- Keep tasks realistic, no overbooking, and fit within a normal day.\n"
-    )
+# === Graph ===
+def build_agent_graph():
+    graph = StateGraph(AgentState)
 
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.4
-    )
+    graph.add_node("classify", classification_agent)
+    graph.add_node("optimize", optimization_agent)
+    graph.add_node("delegate", delegation_agent)
+    graph.add_node("prioritize", prioritization_agent)
+    graph.add_node("schedule", daily_schedule_agent)
+    graph.add_node("summarize", summarization_agent)
 
-    return {"daily_schedule": response.choices[0].message.content.strip()}
+    graph.set_entry_point("classify")
 
-def action_agent(state):
-    prompt = (
-        f"For each prioritized task below, decide if it needs a reminder "
-        f"via Slack, Email, or None. Return only lines like: "
-        f"Task - Slack\n\n{state.prioritized_tasks}"
-    )
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role":"user","content":prompt}],
-        temperature=0.4
-    )
-    summary = response.choices[0].message.content.strip()
+    graph.add_edge("classify", "optimize")
+    graph.add_edge("optimize", "delegate")
+    graph.add_edge("delegate", "prioritize")
+    graph.add_edge("prioritize", "schedule")
+    graph.add_edge("schedule", "summarize")
+    graph.add_edge("summarize", END)
 
-    for line in summary.splitlines():
-        if "Slack" in line:
-            send_slack_message(f"🔔 Reminder: {line}")
-        elif "Email" in line:
-            send_email(subject="Task Reminder", body=line)
-
-    return {"action_summary": summary}
+    return graph
