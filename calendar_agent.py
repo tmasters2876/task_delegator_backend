@@ -1,37 +1,36 @@
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-def diagnose_calendar():
-    creds = Credentials.from_authorized_user_file("/var/data/token.json")
-    service = build("calendar", "v3", credentials=creds)
-
-    print("DEBUG: Using Google account:",
-          creds.id_token.get("email") if creds.id_token else "Unknown (id_token not present)")
-
-    calendar_list = service.calendarList().list().execute()
-    print("DEBUG: Available calendars:")
-    for cal in calendar_list['items']:
-        print(f" - ID: {cal['id']}")
-        print(f"   Summary: {cal['summary']}")
-        print(f"   Primary: {cal.get('primary', False)}")
-        print("-" * 40)
-
 def calendar_agent(final_state):
-    diagnose_calendar()
-    print("DEBUG: final_state received:", final_state)
-    print("DEBUG: final_state['daily_schedule']:", final_state.get("daily_schedule"))
+    try:
+        # Safe inspection of final_state to avoid silent crashes
+        print("DEBUG: Received final_state keys:", list(final_state.keys()))
+        schedule = final_state.get("daily_schedule", [])
+        print("DEBUG: Number of events to insert:", len(schedule))
 
-    creds = Credentials.from_authorized_user_file("/var/data/token.json")
-    service = build("calendar", "v3", credentials=creds)
+        # Load calendar credentials
+        creds = Credentials.from_authorized_user_file("/var/data/token.json")
+        service = build("calendar", "v3", credentials=creds)
 
-    for item in final_state.get("daily_schedule", []):
-        event = {
-            "summary": item["summary"],
-            "start": {"dateTime": item["start"], "timeZone": "UTC"},
-            "end": {"dateTime": item["end"], "timeZone": "UTC"}
-        }
-        print("DEBUG: Creating event:", event)
-        created_event = service.events().insert(calendarId="primary", body=event).execute()
-        print("DEBUG: Event created with ID:", created_event.get("id"))
+        # Show email associated with this token, if available
+        if creds.id_token:
+            print("DEBUG: Authenticated Google account:", creds.id_token.get("email"))
+        else:
+            print("DEBUG: No ID token found in credentials.")
 
-    return {"calendar_confirmation": "Events created successfully"}
+        # Insert calendar events
+        for item in schedule:
+            event = {
+                "summary": item["summary"],
+                "start": {"dateTime": item["start"], "timeZone": "UTC"},
+                "end": {"dateTime": item["end"], "timeZone": "UTC"}
+            }
+            print("DEBUG: Inserting event:", event)
+            created_event = service.events().insert(calendarId="primary", body=event).execute()
+            print("DEBUG: Created event ID:", created_event.get("id"))
+
+        return {"calendar_confirmation": "Events created successfully"}
+
+    except Exception as e:
+        print("❌ ERROR in calendar_agent:", str(e))
+        return {"calendar_confirmation": f"Failed due to: {str(e)}"}
