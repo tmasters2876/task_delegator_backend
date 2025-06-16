@@ -1,17 +1,13 @@
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-
 def diagnose_calendar():
-    # Load the same token from disk
     creds = Credentials.from_authorized_user_file("/var/data/token.json")
     service = build("calendar", "v3", credentials=creds)
 
-    # ✅ 1) Show account email (if possible)
     print("DEBUG: Using Google account:",
           creds.id_token.get("email") if creds.id_token else "Unknown (id_token not present)")
 
-    # ✅ 2) List all accessible calendars
     calendar_list = service.calendarList().list().execute()
     print("DEBUG: Available calendars:")
     for cal in calendar_list['items']:
@@ -20,42 +16,22 @@ def diagnose_calendar():
         print(f"   Primary: {cal.get('primary', False)}")
         print("-" * 40)
 
-
-
 def calendar_agent(final_state):
     diagnose_calendar()
-    # Load credentials from the mounted disk
-    creds = Credentials.from_authorized_user_file("/var/data/token.json")
+    print("DEBUG: final_state received:", final_state)
+    print("DEBUG: final_state['daily_schedule']:", final_state.get("daily_schedule"))
 
-    # Build the Google Calendar service client
+    creds = Credentials.from_authorized_user_file("/var/data/token.json")
     service = build("calendar", "v3", credentials=creds)
 
-    # ✅ Debug: show which Google account is being used (if ID token exists)
-    print("DEBUG: Using Google account:",
-          creds.id_token.get("email") if creds.id_token else "Unknown (id_token not present)")
-
-    # Loop through each scheduled item and create a calendar event
-    for item in final_state["daily_schedule"]:
+    for item in final_state.get("daily_schedule", []):
         event = {
             "summary": item["summary"],
-            "start": {
-                "dateTime": item["start"],
-                "timeZone": "UTC"  # You can adjust timezone as needed
-            },
-            "end": {
-                "dateTime": item["end"],
-                "timeZone": "UTC"
-            }
+            "start": {"dateTime": item["start"], "timeZone": "UTC"},
+            "end": {"dateTime": item["end"], "timeZone": "UTC"}
         }
-
-        # ✅ Debug: show the event payload before sending
         print("DEBUG: Creating event:", event)
-
-        # Call Google Calendar API to insert the event
         created_event = service.events().insert(calendarId="primary", body=event).execute()
-
-        # ✅ Debug: show the response ID to confirm it was created
         print("DEBUG: Event created with ID:", created_event.get("id"))
 
-    # Return a standard confirmation for API response
     return {"calendar_confirmation": "Events created successfully"}
