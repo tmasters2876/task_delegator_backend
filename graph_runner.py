@@ -52,10 +52,27 @@ def build_graph():
         data["prioritized_tasks"] = prioritize_tasks(data["delegated_tasks"])
         return data
 
-    def daily_schedule_agent(data):
-        print("DEBUG: Running daily_schedule_agent")
-        data["daily_schedule"] = build_daily_schedule(data["prioritized_tasks"], data["daily_context"])
-        return data
+    from notifier import send_slack_reminders, send_email_reminder
+
+    def build_daily_schedule(tasks, daily_context):
+        schedule = []
+        for idx, t in enumerate(tasks):
+            event = {
+            "summary": t["task"],
+            "start": f"2024-01-01T09:00:00",
+            "end": f"2024-01-01T10:00:00"
+            }
+            schedule.append(event)
+
+        send_slack_reminders(schedule)
+
+    # ✅ Add email reminder here:
+    email_subject = "Your Daily Schedule"
+    email_body = "\n".join([f"{e['summary']} from {e['start']} to {e['end']}" for e in schedule])
+    send_email_reminder(email_subject, email_body)
+
+    return schedule
+
 
     def summarization_agent(data):
         print("DEBUG: Running summarization_agent")
