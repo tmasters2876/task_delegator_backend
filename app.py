@@ -38,11 +38,8 @@ def upload_secrets():
     creds_file = request.files['credentials']
     token_file = request.files['token']
 
-    creds_path = os.path.join(UPLOAD_FOLDER, "credentials.json")
-    token_path = os.path.join(UPLOAD_FOLDER, "token.json")
-
-    creds_file.save(creds_path)
-    token_file.save(token_path)
+    creds_file.save(os.path.join(UPLOAD_FOLDER, "credentials.json"))
+    token_file.save(os.path.join(UPLOAD_FOLDER, "token.json"))
 
     return jsonify({"message": "Secrets uploaded successfully."})
 

@@ -38,6 +38,65 @@ class AgentState:
             "action_summary": self.action_summary,
         }
 
-# === Your classify_tasks, optimize_tasks, delegate_tasks, etc remain unchanged ===
+def classify_tasks(raw_input):
+    tasks = [task.strip() for task in raw_input.split(",") if task.strip()]
+    return [{"task": task} for task in tasks]
 
-# === Your build_graph() remains unchanged ===
+def optimize_tasks(tasks):
+    return tasks
+
+def delegate_tasks(tasks):
+    return tasks
+
+def prioritize_tasks(tasks):
+    return tasks
+
+def build_daily_schedule(tasks, daily_context):
+    return [{"summary": t["task"], "start": "2024-01-01T09:00:00", "end": "2024-01-01T10:00:00"} for t in tasks]
+
+def summarize_action_plan(schedule):
+    return f"Planned {len(schedule)} tasks for today."
+
+def build_graph():
+    graph = StateGraph(AgentState)
+
+    def classification_agent(state):
+        state.classified_tasks = classify_tasks(state.raw_input)
+        return state
+
+    def optimization_agent(state):
+        state.optimized_tasks = optimize_tasks(state.classified_tasks)
+        return state
+
+    def delegation_agent(state):
+        state.delegated_tasks = delegate_tasks(state.optimized_tasks)
+        return state
+
+    def prioritization_agent(state):
+        state.prioritized_tasks = prioritize_tasks(state.delegated_tasks)
+        return state
+
+    def daily_schedule_agent(state):
+        state.daily_schedule = build_daily_schedule(state.prioritized_tasks, state.daily_context)
+        return state
+
+    def summarization_agent(state):
+        state.action_summary = summarize_action_plan(state.daily_schedule)
+        return state
+
+    graph.add_node("classify", classification_agent)
+    graph.add_node("optimize", optimization_agent)
+    graph.add_node("delegate", delegation_agent)
+    graph.add_node("prioritize", prioritization_agent)
+    graph.add_node("schedule", daily_schedule_agent)
+    graph.add_node("summarize", summarization_agent)
+
+    graph.set_entry_point("classify")
+    graph.add_edge("classify", "optimize")
+    graph.add_edge("optimize", "delegate")
+    graph.add_edge("delegate", "prioritize")
+    graph.add_edge("prioritize", "schedule")
+    graph.add_edge("schedule", "summarize")
+    graph.add_edge("summarize", END)
+
+    return graph
