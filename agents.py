@@ -1,41 +1,14 @@
 from langgraph.graph import StateGraph, END
-from operator import itemgetter
-from langgraph.prebuilt import tools_condition
-from notifier import classify_tasks, optimize_tasks, delegate_tasks, prioritize_tasks, build_daily_schedule, summarize_action_plan
-
-# === Agent State ===
-class AgentState:
-    def __init__(self, raw_input="", daily_context=""):
-        self.raw_input = raw_input
-        self.classified_tasks = []
-        self.optimized_tasks = []
-        self.delegated_tasks = []
-        self.prioritized_tasks = []
-        self.daily_schedule = []
-        self.action_summary = ""
-
-    def to_dict(self):
-        def safe(obj):
-            if hasattr(obj, "model_dump"):
-                return obj.model_dump()
-            elif hasattr(obj, "__dict__"):
-                return obj.__dict__
-            elif isinstance(obj, list):
-                return [safe(x) for x in obj]
-            elif isinstance(obj, dict):
-                return {k: safe(v) for k, v in obj.items()}
-            else:
-                return obj
-
-        return {
-            "raw_input": self.raw_input,
-            "classified_tasks": safe(self.classified_tasks),
-            "optimized_tasks": safe(self.optimized_tasks),
-            "delegated_tasks": safe(self.delegated_tasks),
-            "prioritized_tasks": safe(self.prioritized_tasks),
-            "daily_schedule": safe(self.daily_schedule),
-            "action_summary": self.action_summary,
-        }
+from graph_runner import (
+    classify_tasks,
+    optimize_tasks,
+    delegate_tasks,
+    prioritize_tasks,
+    build_daily_schedule,
+    summarize_action_plan,
+    AgentState,
+    build_graph
+)
 
 # === Core Task Agents ===
 def classification_agent(state):
