@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, END
-from notifier import send_slack_reminders
+from notifier import send_slack_reminders, send_email_reminder
 
 def classify_tasks(raw_input):
     tasks = [task.strip() for task in raw_input.split(",") if task.strip()]
@@ -23,14 +23,22 @@ def build_daily_schedule(tasks, daily_context):
             "end": f"2024-01-01T10:00:00"
         }
         schedule.append(event)
+
+    # Slack
     send_slack_reminders(schedule)
+
+    # Email
+    email_subject = "Your Daily Schedule"
+    email_body = "\n".join([f"{e['summary']} from {e['start']} to {e['end']}" for e in schedule])
+    send_email_reminder(email_subject, email_body)
+
     return schedule
 
 def summarize_action_plan(schedule):
     return f"Planned {len(schedule)} tasks for today."
 
 def build_graph():
-    graph = StateGraph(dict)  # ✅ must be dict
+    graph = StateGraph(dict)
 
     def classification_agent(data):
         print("DEBUG: Running classification_agent")
@@ -52,27 +60,10 @@ def build_graph():
         data["prioritized_tasks"] = prioritize_tasks(data["delegated_tasks"])
         return data
 
-    from notifier import send_slack_reminders, send_email_reminder
-
-    def build_daily_schedule(tasks, daily_context):
-        schedule = []
-        for idx, t in enumerate(tasks):
-            event = {
-            "summary": t["task"],
-            "start": f"2024-01-01T09:00:00",
-            "end": f"2024-01-01T10:00:00"
-            }
-            schedule.append(event)
-
-        send_slack_reminders(schedule)
-
-    # ✅ Add email reminder here:
-    email_subject = "Your Daily Schedule"
-    email_body = "\n".join([f"{e['summary']} from {e['start']} to {e['end']}" for e in schedule])
-    send_email_reminder(email_subject, email_body)
-
-    return schedule
-
+    def daily_schedule_agent(data):
+        print("DEBUG: Running daily_schedule_agent")
+        data["daily_schedule"] = build_daily_schedule(data["prioritized_tasks"], data["daily_context"])
+        return data
 
     def summarization_agent(data):
         print("DEBUG: Running summarization_agent")
