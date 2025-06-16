@@ -1,42 +1,5 @@
 from langgraph.graph import StateGraph, END
-import json
-
-class AgentState:
-    def __init__(self, raw_input="", daily_context=""):
-        self.raw_input = raw_input
-        self.classified_tasks = []
-        self.optimized_tasks = []
-        self.delegated_tasks = []
-        self.prioritized_tasks = []
-        self.daily_schedule = []
-        self.action_summary = ""
-
-    def to_dict(self):
-        def safe(obj):
-            try:
-                json.dumps(obj)
-                return obj
-            except (TypeError, OverflowError):
-                if hasattr(obj, "model_dump"):
-                    return obj.model_dump()
-                elif hasattr(obj, "__dict__"):
-                    return {k: safe(v) for k, v in vars(obj).items()}
-                elif isinstance(obj, list):
-                    return [safe(x) for x in obj]
-                elif isinstance(obj, dict):
-                    return {k: safe(v) for k, v in obj.items()}
-                else:
-                    return str(obj)
-
-        return {
-            "raw_input": self.raw_input,
-            "classified_tasks": safe(self.classified_tasks),
-            "optimized_tasks": safe(self.optimized_tasks),
-            "delegated_tasks": safe(self.delegated_tasks),
-            "prioritized_tasks": safe(self.prioritized_tasks),
-            "daily_schedule": safe(self.daily_schedule),
-            "action_summary": self.action_summary,
-        }
+from notifier import send_slack_reminders
 
 def classify_tasks(raw_input):
     tasks = [task.strip() for task in raw_input.split(",") if task.strip()]
@@ -52,18 +15,26 @@ def prioritize_tasks(tasks):
     return tasks
 
 def build_daily_schedule(tasks, daily_context):
-    return [{"summary": t["task"], "start": "2024-01-01T09:00:00", "end": "2024-01-01T10:00:00"} for t in tasks]
+    schedule = []
+    for idx, t in enumerate(tasks):
+        event = {
+            "summary": t["task"],
+            "start": f"2024-01-01T09:00:00",
+            "end": f"2024-01-01T10:00:00"
+        }
+        schedule.append(event)
+    send_slack_reminders(schedule)
+    return schedule
 
 def summarize_action_plan(schedule):
     return f"Planned {len(schedule)} tasks for today."
 
 def build_graph():
-    graph = StateGraph(dict)  # NOT AgentState anymore
+    graph = StateGraph(dict)  # ✅ use dict not class
 
     def classification_agent(data):
         print("DEBUG: Running classification_agent")
-        tasks = classify_tasks(data["raw_input"])
-        data["classified_tasks"] = tasks
+        data["classified_tasks"] = classify_tasks(data["raw_input"])
         return data
 
     def optimization_agent(data):

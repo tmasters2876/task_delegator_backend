@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from graph_runner import build_graph, AgentState
+from graph_runner import build_graph
 from calendar_agent import calendar_agent
 import os
 
@@ -25,7 +25,6 @@ def run_task_delegator():
     final_state["calendar_confirmation"] = calendar_result["calendar_confirmation"]
 
     return jsonify(final_state)
-
 
 @app.route("/upload", methods=["POST"])
 def upload_secrets():
