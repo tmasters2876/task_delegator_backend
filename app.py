@@ -12,19 +12,20 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.route("/run", methods=["POST"])
 def run_task_delegator():
     data = request.json or {}
-    user_input = data.get("tasks", "")
-    daily_context = data.get("daily_context", "")
+    input_data = {
+        "raw_input": data.get("tasks", ""),
+        "daily_context": data.get("daily_context", "")
+    }
 
-    state = AgentState(raw_input=user_input, daily_context=daily_context)
     graph = build_graph()
-    final_state = graph.invoke(state)
+    final_state = graph.invoke(input_data)
 
     calendar_result = calendar_agent(final_state)
 
-    response = final_state.to_dict()
-    response["calendar_confirmation"] = calendar_result["calendar_confirmation"]
+    final_state["calendar_confirmation"] = calendar_result["calendar_confirmation"]
 
-    return jsonify(response)
+    return jsonify(final_state)
+
 
 @app.route("/upload", methods=["POST"])
 def upload_secrets():

@@ -58,37 +58,38 @@ def summarize_action_plan(schedule):
     return f"Planned {len(schedule)} tasks for today."
 
 def build_graph():
-    graph = StateGraph(AgentState)
+    graph = StateGraph(dict)  # NOT AgentState anymore
 
-    def classification_agent(state):
+    def classification_agent(data):
         print("DEBUG: Running classification_agent")
-        state.classified_tasks = classify_tasks(state.raw_input)
-        return state
+        tasks = classify_tasks(data["raw_input"])
+        data["classified_tasks"] = tasks
+        return data
 
-    def optimization_agent(state):
+    def optimization_agent(data):
         print("DEBUG: Running optimization_agent")
-        state.optimized_tasks = optimize_tasks(state.classified_tasks)
-        return state
+        data["optimized_tasks"] = optimize_tasks(data["classified_tasks"])
+        return data
 
-    def delegation_agent(state):
+    def delegation_agent(data):
         print("DEBUG: Running delegation_agent")
-        state.delegated_tasks = delegate_tasks(state.optimized_tasks)
-        return state
+        data["delegated_tasks"] = delegate_tasks(data["optimized_tasks"])
+        return data
 
-    def prioritization_agent(state):
+    def prioritization_agent(data):
         print("DEBUG: Running prioritization_agent")
-        state.prioritized_tasks = prioritize_tasks(state.delegated_tasks)
-        return state
+        data["prioritized_tasks"] = prioritize_tasks(data["delegated_tasks"])
+        return data
 
-    def daily_schedule_agent(state):
+    def daily_schedule_agent(data):
         print("DEBUG: Running daily_schedule_agent")
-        state.daily_schedule = build_daily_schedule(state.prioritized_tasks, state.daily_context)
-        return state
+        data["daily_schedule"] = build_daily_schedule(data["prioritized_tasks"], data["daily_context"])
+        return data
 
-    def summarization_agent(state):
+    def summarization_agent(data):
         print("DEBUG: Running summarization_agent")
-        state.action_summary = summarize_action_plan(state.daily_schedule)
-        return state
+        data["action_summary"] = summarize_action_plan(data["daily_schedule"])
+        return data
 
     graph.add_node("classify", classification_agent)
     graph.add_node("optimize", optimization_agent)
@@ -105,5 +106,4 @@ def build_graph():
     graph.add_edge("schedule", "summarize")
     graph.add_edge("summarize", END)
 
-    return graph.compile()   # ✅ compile it here!
-
+    return graph.compile()
