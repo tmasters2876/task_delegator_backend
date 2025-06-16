@@ -1,36 +1,32 @@
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import os
 
 def calendar_agent(final_state):
-    try:
-        # Safe inspection of final_state to avoid silent crashes
-        print("DEBUG: Received final_state keys:", list(final_state.keys()))
-        schedule = final_state.get("daily_schedule", [])
-        print("DEBUG: Number of events to insert:", len(schedule))
+    # Use env var path if set, else fallback to local dev default
+    token_path = os.environ.get("GOOGLE_TOKEN_PATH", "token.json")
+    print(f"✅ DEBUG: Using token path: {token_path}")
 
-        # Load calendar credentials
-        creds = Credentials.from_authorized_user_file("/var/data/token.json")
-        service = build("calendar", "v3", credentials=creds)
+    creds = Credentials.from_authorized_user_file(token_path)
+    service = build("calendar", "v3", credentials=creds)
 
-        # Show email associated with this token, if available
-        if creds.id_token:
-            print("DEBUG: Authenticated Google account:", creds.id_token.get("email"))
-        else:
-            print("DEBUG: No ID token found in credentials.")
+    # Debug: confirm which account
+    if creds.id_token:
+        print("✅ DEBUG: Authenticated Google account:", creds.id_token.get("email"))
+    else:
+        print("⚠️ DEBUG: No ID token found — using refresh_token only.")
 
-        # Insert calendar events
-        for item in schedule:
-            event = {
-                "summary": item["summary"],
-                "start": {"dateTime": item["start"], "timeZone": "UTC"},
-                "end": {"dateTime": item["end"], "timeZone": "UTC"}
-            }
-            print("DEBUG: Inserting event:", event)
-            created_event = service.events().insert(calendarId="primary", body=event).execute()
-            print("DEBUG: Created event ID:", created_event.get("id"))
+    schedule = final_state.get("daily_schedule", [])
+    print(f"✅ DEBUG: Number of events to insert: {len(schedule)}")
 
-        return {"calendar_confirmation": "Events created successfully"}
+    for item in schedule:
+        event = {
+            "summary": item["summary"],
+            "start": {"dateTime": item["start"], "timeZone": "UTC"},
+            "end": {"dateTime": item["end"], "timeZone": "UTC"}
+        }
+        print("➡️ DEBUG: Creating event:", event)
+        created_event = service.events().insert(calendarId="primary", body=event).execute()
+        print("✅ DEBUG: Event created with ID:", created_event.get("id"))
 
-    except Exception as e:
-        print("❌ ERROR in calendar_agent:", str(e))
-        return {"calendar_confirmation": f"Failed due to: {str(e)}"}
+    return {"calendar_confirmation": "Events created successfully"}
