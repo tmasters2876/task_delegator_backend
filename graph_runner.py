@@ -71,7 +71,7 @@ def build_graph():
         return state
 
     def delegation_agent(state):
-        pprint("DEBUG: Running delegation_agent")
+        print("DEBUG: Running delegation_agent")
         state.delegated_tasks = delegate_tasks(state.optimized_tasks)
         return state
 
@@ -105,4 +105,5 @@ def build_graph():
     graph.add_edge("schedule", "summarize")
     graph.add_edge("summarize", END)
 
-    return graph
+    return graph.compile()   # ✅ compile it here!
+
