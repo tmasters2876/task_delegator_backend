@@ -1,5 +1,6 @@
 from langgraph.graph import StateGraph, END
 from notifier import send_slack_reminders, send_email_reminder
+from datetime import datetime, timedelta
 
 def classify_tasks(raw_input):
     tasks = [task.strip() for task in raw_input.split(",") if task.strip()]
@@ -16,11 +17,17 @@ def prioritize_tasks(tasks):
 
 def build_daily_schedule(tasks, daily_context):
     schedule = []
+    # ✅ Use dynamic base time instead of hardcoded date
+    base = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    duration = 60  # 1 hr blocks
+
     for idx, t in enumerate(tasks):
+        start_time = base + timedelta(hours=idx)
+        end_time = start_time + timedelta(minutes=duration)
         event = {
             "summary": t["task"],
-            "start": f"2024-01-01T09:00:00",
-            "end": f"2024-01-01T10:00:00"
+            "start": start_time.isoformat(),
+            "end": end_time.isoformat()
         }
         schedule.append(event)
 
