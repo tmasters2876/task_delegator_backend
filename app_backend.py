@@ -1,11 +1,9 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # ✅ Add CORS
 from graph_runner import build_graph
 from calendar_agent import calendar_agent
 import os
 
 app = Flask(__name__)
-CORS(app)  # ✅ Enable CORS for all routes
 
 UPLOAD_KEY = os.environ.get("ADMIN_UPLOAD_KEY", "mysecretadminkey")
 UPLOAD_FOLDER = "/var/data"
@@ -14,19 +12,19 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.route("/run", methods=["POST"])
 def run_task_delegator():
     data = request.json or {}
-    user_input = data.get("tasks", "")
-    daily_context = data.get("daily_context", "")
+    input_data = {
+        "raw_input": data.get("tasks", ""),
+        "daily_context": data.get("daily_context", "")
+    }
 
-    state = {"raw_input": user_input, "daily_context": daily_context}
     graph = build_graph()
-    final_state = graph.invoke(state)
+    final_state = graph.invoke(input_data)
 
     calendar_result = calendar_agent(final_state)
 
-    return jsonify({
-        **final_state,
-        "calendar_confirmation": calendar_result["calendar_confirmation"]
-    })
+    final_state["calendar_confirmation"] = calendar_result["calendar_confirmation"]
+
+    return jsonify(final_state)
 
 @app.route("/upload", methods=["POST"])
 def upload_secrets():
